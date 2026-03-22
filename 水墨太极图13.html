@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>水墨太极交互 - 网页版</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: rgb(112, 124, 122); font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .text-layer { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; user-select: none; text-align: center; }
+        #hint-text { top: 85%; color: #f0f0f0; font-size: 1.1rem; letter-spacing: 4px; opacity: 0.8; transition: opacity 2s ease-in-out; text-shadow: 1px 1px 5px rgba(0,0,0,0.8); }
+        #zen-text, #zen-text-2 { top: 48%; transform: translate(-50%, -50%); color: #f5f5f5; font-size: 1.8rem; letter-spacing: 6px; font-family: "STZhongsong", "SimSun", serif; opacity: 0; transition: opacity 2.5s ease-in-out, transform 3s ease-out; text-shadow: 0px 0px 15px rgba(0,0,0, 0.8); width: 100%; }
+        #zen-text.active, #zen-text-2.active { opacity: 0.85; transform: translate(-50%, -52%); }
+        #time-freeze-hint { top: 25%; color: #ffd700; font-size: 1.5rem; letter-spacing: 8px; font-family: "STZhongsong", serif; opacity: 0; transition: opacity 0.3s ease; text-shadow: 0px 0px 20px rgba(255, 215, 0, 0.8); pointer-events: none; z-index: 50; }
+        #hint-3d { top: 15%; color: #00ffff; font-size: 1.1rem; letter-spacing: 4px; opacity: 0; transition: opacity 1.5s ease-in-out; text-shadow: 0px 0px 10px rgba(0,255,255,0.6); pointer-events: none; }
+
+        #mode-btn { position: absolute; bottom: 30px; left: 30px; padding: 8px 18px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.4); color: #f0f0f0; font-size: 1rem; font-family: "PingFang SC", "SimSun", sans-serif; letter-spacing: 2px; cursor: pointer; border-radius: 4px; transition: all 0.4s ease; user-select: none; z-index: 10; backdrop-filter: blur(2px); }
+        #mode-btn:hover { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+
+        #color-controls { position: absolute; top: 30px; left: 30px; z-index: 10; }
+        #color-toggle { padding: 8px 18px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.4); color: #f0f0f0; font-size: 1rem; font-family: "PingFang SC", "SimSun", sans-serif; letter-spacing: 2px; cursor: pointer; border-radius: 4px; backdrop-filter: blur(2px); transition: all 0.4s ease; user-select: none; }
+        #color-toggle:hover { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+        #color-panel { margin-top: 10px; padding: 15px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; backdrop-filter: blur(5px); display: none; flex-direction: column; gap: 12px; }
+        #color-panel.show { display: flex; }
+        .color-item { display: flex; align-items: center; justify-content: space-between; color: #f0f0f0; font-size: 0.9rem; font-family: "PingFang SC", sans-serif; width: 150px; letter-spacing: 1px; }
+        .color-item input[type="color"] { width: 35px; height: 35px; border: none; border-radius: 4px; cursor: pointer; padding: 0; background: transparent; }
+        .color-item input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-item input[type="color"]::-webkit-color-swatch { border: 1px solid rgba(255,255,255,0.5); border-radius: 4px; }
+
+        #magic-controls { position: absolute; top: 30px; right: 30px; z-index: 10; display: flex; flex-direction: column; gap: 15px; }
+        .magic-btn { padding: 8px 18px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.4); color: #f0f0f0; font-size: 1rem; font-family: "PingFang SC", "SimSun", sans-serif; letter-spacing: 2px; cursor: pointer; border-radius: 4px; backdrop-filter: blur(2px); transition: all 0.4s ease; user-select: none; }
+        .magic-btn:hover { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+        #glow-toggle.active { background: rgba(255, 215, 0, 0.15); border-color: rgba(255, 215, 0, 0.6); color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.3); text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); }
+        #formation-toggle.active { background: rgba(0, 255, 255, 0.15); border-color: rgba(0, 255, 255, 0.6); color: #00ffff; box-shadow: 0 0 20px rgba(0, 255, 255, 0.3); text-shadow: 0 0 8px rgba(0, 255, 255, 0.5); }
+        #mode-3d-toggle.active { background: rgba(0, 255, 255, 0.15); border-color: rgba(0, 255, 255, 0.6); color: #00ffff; box-shadow: 0 0 20px rgba(0, 255, 255, 0.3); text-shadow: 0 0 8px rgba(0, 255, 255, 0.5); }
+
+        #formation-type { margin-top: 8px; padding: 5px 10px; background: rgba(0, 0, 0, 0.4); color: #00ffff; border: 1px solid rgba(0, 255, 255, 0.4); outline: none; text-align: center; appearance: none; -webkit-appearance: none; border-radius: 4px;}
+        #formation-type option { background: #222; color: #fff; }
+
+        #author-btn { position: absolute; bottom: 30px; right: 30px; padding: 8px 18px; background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.4); color: #f0f0f0; font-size: 1rem; font-family: "PingFang SC", "SimSun", sans-serif; letter-spacing: 2px; cursor: pointer; border-radius: 4px; transition: all 0.4s ease; user-select: none; z-index: 10; backdrop-filter: blur(2px); }
+        #author-btn:hover { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 15px rgba(255,255,255,0.2); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-content { background: rgba(30, 35, 35, 0.85); border: 1px solid rgba(0, 255, 255, 0.3); box-shadow: 0 0 30px rgba(0, 255, 255, 0.1); padding: 35px 40px; border-radius: 12px; color: #f0f0f0; font-family: "PingFang SC", sans-serif; position: relative; max-width: 450px; width: 90%; transform: translateY(20px); transition: transform 0.4s ease; }
+        .modal-overlay.show .modal-content { transform: translateY(0); }
+        .modal-content h3 { text-align: center; margin-bottom: 25px; color: #00ffff; font-weight: 300; letter-spacing: 4px; }
+        .modal-content p { margin: 12px 0; font-size: 1.05rem; letter-spacing: 1px; line-height: 1.6; }
+        .modal-content strong { color: #b0c4de; font-weight: 400; display: inline-block; width: 80px; }
+        .modal-content a { color: #00ffff; text-decoration: none; transition: text-shadow 0.3s; }
+        .modal-content a:hover { text-shadow: 0 0 8px rgba(0,255,255,0.6); }
+        .modal-footer { margin-top: 30px; padding-top: 20px; border-top: 1px dashed rgba(255, 255, 255, 0.2); text-align: center; font-size: 0.95rem; color: #ccc; line-height: 1.8; letter-spacing: 1px; }
+        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 1.8rem; color: #aaa; cursor: pointer; transition: color 0.3s; }
+        .close-btn:hover { color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div id="hint-text" class="text-layer">点击反转，不断滑动唤醒游龙，长按搅动进入无极</div>
+    <div id="time-freeze-hint" class="text-layer">⏱️ 时 空 凝 滞</div>
+
+    <div id="zen-text" class="text-layer">
+        世界既不黑也不白，而是一道精致的灰
+        <span style="display: block; font-size: 1.1rem; font-family: 'PingFang SC', sans-serif; letter-spacing: 2px; margin-top: 15px; opacity: 0.8;">
+            The world is neither black nor white, but a delicate shade of gray.
+        </span>
+    </div>
+    
+    <div id="zen-text-2" class="text-layer">
+        尽人事，听天命
+        <span style="display: block; font-size: 1.1rem; font-family: 'PingFang SC', sans-serif; letter-spacing: 2px; margin-top: 15px; opacity: 0.8;">
+            Do your best, and leave the rest to fate.
+        </span>
+    </div>
+
+    <div id="hint-3d" class="text-layer">
+        💡 滚动鼠标滚轮缩放星系 | 空格键触发子弹时间
+    </div>
+    
+    <button id="mode-btn">当前：太极图</button>
+
+    <div id="color-controls">
+        <button id="color-toggle">🎨 自定义颜色</button>
+        <div id="color-panel">
+            <div class="color-item">
+                <label>背景颜色</label>
+                <input type="color" id="bg-color-picker" value="#707c7a">
+            </div>
+            <div class="color-item">
+                <label>阴鱼颜色</label>
+                <input type="color" id="color1-picker" value="#141414">
+            </div>
+            <div class="color-item">
+                <label>阳鱼颜色</label>
+                <input type="color" id="color2-picker" value="#f0f0f0">
+            </div>
+        </div>
+    </div>
+
+    <div id="magic-controls">
+        <button id="glow-toggle" class="magic-btn">✨ 灵光特效</button>
+        <div style="display: flex; flex-direction: column;">
+            <button id="formation-toggle" class="magic-btn">☯️ 聚灵法阵</button>
+            <select id="formation-type" class="magic-btn" style="display: none;">
+                <option value="math">📐 动态几何与公式</option>
+                <option value="mandala">💠 幻梦曼陀罗</option>
+                <option value="lotus">🪷 琉璃净世莲</option>
+                <option value="bagua">☯️ 细线八卦</option>
+            </select>
+        </div>
+        <button id="mode-3d-toggle" class="magic-btn">🧊 3D模式</button>
+    </div>
+
+    <button id="author-btn">ℹ️ 关于作者</button>
+
+    <div id="author-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn" id="close-author">&times;</span>
+            <h3>✨ 作者信息 ✨</h3>
+            <p><strong>作　者：</strong>左手偏左</p>
+            <p><strong>小红书：</strong>94146099410</p>
+            <p><strong>站　酷：</strong>yc永成设计</p>
+            <p><strong>邮　箱：</strong><a href="mailto:zyc114115@163.com">zyc114115@163.com</a></p>
+            <p><strong>GitHub：</strong><a href="https://github.com/04042-ui" target="_blank">04042-ui</a></p>
+            <div class="modal-footer">
+                🚀 已开源，欢迎大家提出修改意见！<br>
+                祝大家生活顺利，玩得愉快！🎉
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const hintText = document.getElementById('hint-text');
+        const zenText = document.getElementById('zen-text');
+        const zenText2 = document.getElementById('zen-text-2'); 
+        const modeBtn = document.getElementById('mode-btn');    
+
+        let width, height;
+        let particles = [];
+        const R = 220; 
+        let angle = 0; 
+
+        let currentMode = 1;       
+        let modeLerp = 0;          
+        
+        let targetColorSwap = 0;   
+        let colorSwapLerp = 0;     
+
+        let angleOffset = 0;       
+        let targetAngleOffset = 0; 
+
+        // 游龙轨迹系统变量
+        let mouseEnergy = 0;       
+        let isDragonMode = false;  
+        let dragonLerp = 0;        
+        let dragonSpine = [];      
+        let lastMouse = {x: -1000, y: -1000};
+
+        let isDragging = false;    
+        let mixEnergy = 0;         
+        let mixLerp = 0;           
+        let isZenMode = false;     
+        let ignoreDrag = false;    
+
+        let mouse = {
+            x: -1000, y: -1000,
+            logicalX: -1000, logicalY: -1000,
+            radius: 120, isActive: false
+        };
+
+        function updateLogicalMouse(clientX, clientY) {
+            const cx = width / 2;
+            const cy = height / 2;
+            mouse.logicalX = cx + (clientX - cx) / currentZoom2D;
+            mouse.logicalY = cy + (clientY - cy) / currentZoom2D;
+        }
+
+        let bgBaseR = 112, bgBaseG = 124, bgBaseB = 122;
+        let c1BaseR = 20, c1BaseG = 20, c1BaseB = 20;     
+        let c2BaseR = 240, c2BaseG = 240, c2BaseB = 240;  
+
+        let isGlowMode = false;
+        let isFormationMode = false; 
+        let formationLerp = 0;       
+        let formationAngle = 0;      
+        let morphTime = 0;           
+        let currentFormationType = 'math'; 
+
+        let pointerTrail = [];
+        let timeScale = 1.0;         
+        let targetTimeScale = 1.0;   
+        let lastTapTime = 0;         
+
+        let is3DMode = false;
+        let lerp3D = 0;
+        let rotX = 0, rotY = 0;
+        let targetRotX = 0, targetRotY = 0;
+        let currentCameraZ = 200; 
+        let targetCameraZ = 200;
+        let initialPinchDist = 0; 
+
+        let currentZoom2D = 1.0;
+        let targetZoom2D = 1.0;
+
+        function showHintMessage(msg, color = '#ffd700', duration = 2000) {
+            const hint = document.getElementById('time-freeze-hint');
+            hint.style.color = color;
+            hint.style.textShadow = `0px 0px 20px rgba(${color === '#00ffff' ? '0,255,255' : '255,215,0'}, 0.8)`;
+            hint.innerText = msg;
+            hint.style.opacity = '1';
+            setTimeout(() => {
+                hint.style.opacity = '0';
+                setTimeout(() => {
+                    hint.innerText = "⏱️ 时 空 凝 滞";
+                    hint.style.color = '#ffd700';
+                    hint.style.textShadow = '0px 0px 20px rgba(255, 215, 0, 0.8)';
+                }, 300);
+            }, duration);
+        }
+
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        }
+
+        setTimeout(() => { if (hintText) hintText.style.opacity = '0'; }, 6000);
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function getTaiChiColor(x, y) {
+            let d = Math.hypot(x, y);
+            if (d > R) return null; 
+            if (Math.hypot(x, y + R / 2) < R / 6) return 'black';
+            if (Math.hypot(x, y - R / 2) < R / 6) return 'white';
+            if (Math.hypot(x, y + R / 2) < R / 2) return 'white';
+            if (Math.hypot(x, y - R / 2) < R / 2) return 'black';
+            return x > 0 ? 'black' : 'white';
+        }
+
+        class Particle {
+            constructor(baseX, baseY, colorType) {
+                this.colorType = colorType; 
+                this.isLeft = (colorType === 'black'); 
+                this.baseX = baseX + (Math.random() - 0.5) * 6;
+                this.baseY = baseY + (Math.random() - 0.5) * 6;
+                this.x = width / 2 + (Math.random() - 0.5) * width;
+                this.y = height / 2 + (Math.random() - 0.5) * height;
+                this.vx = 0; this.vy = 0;
+                this.size = Math.random() * 2 + 0.6; 
+                this.baseSpring = Math.random() * 0.015 + 0.01; 
+                this.friction = Math.random() * 0.05 + 0.86; 
+
+                this.m2_vx = 0; this.m2_vy = 0;
+                this.m2_speed = Math.random() * 2.5 + 1.5; 
+                this.m2_offsetX_ratio = Math.random(); 
+                
+                this.zSign = Math.random() > 0.5 ? 1 : -1; 
+                this.projX = 0; this.projY = 0; this.projZ = 0; this.projScale = 1;
+
+                if (this.isLeft) {
+                    this.m2_x = (window.innerWidth / 2) * this.m2_offsetX_ratio;
+                } else {
+                    this.m2_x = window.innerWidth / 2 + (window.innerWidth / 2) * this.m2_offsetX_ratio;
+                }
+                this.m2_y = Math.random() * window.innerHeight;
+
+                let dist = Math.hypot(baseX, baseY);
+                this.ratio = Math.min(dist / R, 1); // 0是中心, 1是边缘
+
+                if (colorType === 'black') {
+                    this.base_r = Math.max(0, Math.min(255, c1BaseR + (Math.random() * 30 - 15)));
+                    this.base_g = Math.max(0, Math.min(255, c1BaseG + (Math.random() * 30 - 15)));
+                    this.base_b = Math.max(0, Math.min(255, c1BaseB + (Math.random() * 30 - 15)));
+                    this.a = Math.random() * 0.5 + 0.2;
+                } else {
+                    this.base_r = Math.max(0, Math.min(255, c2BaseR + (Math.random() * 20 - 10)));
+                    this.base_g = Math.max(0, Math.min(255, c2BaseG + (Math.random() * 20 - 10)));
+                    this.base_b = Math.max(0, Math.min(255, c2BaseB + (Math.random() * 20 - 10)));
+                    this.a = Math.random() * 0.5 + 0.25;
+                }
+            }
+
+            update(cx, cy, currentAngle) {
+                let totalAngle = currentAngle + angleOffset;
+                let taiChiX = cx + this.baseX * Math.cos(totalAngle) - this.baseY * Math.sin(totalAngle);
+                let taiChiY = cy + this.baseX * Math.sin(totalAngle) + this.baseY * Math.cos(totalAngle);
+                
+                let divideX = width / 2 + Math.sin(this.m2_y * 0.005 + currentAngle * 1.5) * (width * 0.12);
+                
+                if (this.isLeft) {
+                    this.m2_vy = this.m2_speed;
+                    let targetX = (divideX - 15) * this.m2_offsetX_ratio;
+                    let targetVx = (targetX - this.m2_x) * 0.015;
+                    this.m2_vx += (targetVx - this.m2_vx) * 0.05; 
+                    if (this.m2_y > height + 50) {
+                        this.m2_y = -50;
+                        this.m2_offsetX_ratio = Math.random(); 
+                        this.m2_x = (width / 2) * this.m2_offsetX_ratio;
+                    }
+                } else {
+                    this.m2_vy = -this.m2_speed;
+                    let targetX = (divideX + 15) + (width - divideX - 15) * this.m2_offsetX_ratio;
+                    let targetVx = (targetX - this.m2_x) * 0.015;
+                    this.m2_vx += (targetVx - this.m2_vx) * 0.05;
+                    if (this.m2_y < -50) {
+                        this.m2_y = height + 50;
+                        this.m2_offsetX_ratio = Math.random(); 
+                        this.m2_x = width / 2 + (width / 2) * this.m2_offsetX_ratio;
+                    }
+                }
+
+                this.m2_x += this.m2_vx;
+                this.m2_y += this.m2_vy;
+
+                let baseTargetX = taiChiX * (1 - modeLerp) + this.m2_x * modeLerp;
+                let baseTargetY = taiChiY * (1 - modeLerp) + this.m2_y * modeLerp;
+
+                let targetX = baseTargetX;
+                let targetY = baseTargetY;
+
+                // 【修复核心交互】: 游龙轨迹系统映射
+                if (dragonLerp > 0.01 && dragonSpine.length > 5) {
+                    // 反转索引：太极中心(ratio=0)映射到头部(length-1)，太极边缘(ratio=1)映射到尾部(0)
+                    let spineIdx = Math.floor((1 - this.ratio) * (dragonSpine.length - 1));
+                    let pt = dragonSpine[spineIdx];
+                    if (pt) {
+                        // 鳞片缩放：头部较宽，尾部收拢
+                        let scale = (1 - this.ratio) * 0.45 + 0.15; 
+                        let dragonX = pt.x + this.baseX * scale;
+                        let dragonY = pt.y + this.baseY * scale;
+                        
+                        targetX = baseTargetX * (1 - dragonLerp) + dragonX * dragonLerp;
+                        targetY = baseTargetY * (1 - dragonLerp) + dragonY * dragonLerp;
+                    }
+                }
+
+                let currentSpring = this.baseSpring * (1 - mixLerp * 0.85); 
+                
+                // 禅定(无极)模式的物理搅动
+                if (mixLerp > 0.01) {
+                    let dxCenter = this.x - cx;
+                    let dyCenter = this.y - cy;
+                    let distCenter = Math.hypot(dxCenter, dyCenter) || 1;
+                    this.vx += (-dyCenter / distCenter) * mixLerp * 1.5;
+                    this.vy += (dxCenter / distCenter) * mixLerp * 1.5;
+                    this.vx -= (dxCenter / distCenter) * mixLerp * 0.2;
+                    this.vy -= (dyCenter / distCenter) * mixLerp * 0.2;
+                }
+
+                let dx = targetX - this.x;
+                let dy = targetY - this.y;
+                this.vx += dx * currentSpring;
+                this.vy += dy * currentSpring;
+
+                // 鼠标常规的排斥与扰动流场
+                if (mouse.isActive && !is3DMode) {
+                    let mdx = this.x - mouse.logicalX; 
+                    let mdy = this.y - mouse.logicalY;
+                    let dist = Math.hypot(mdx, mdy);
+                    if (dist < mouse.radius) {
+                        let force = (mouse.radius - dist) / mouse.radius;
+                        let swirlX = -mdy / dist;
+                        let swirlY = mdx / dist;
+                        let pushX = mdx / dist;
+                        let pushY = mdy / dist;
+                        this.vx += (pushX * 1.8 + swirlX * 3.2) * force;
+                        this.vy += (pushY * 1.8 + swirlY * 3.2) * force;
+                    }
+                }
+
+                this.vx += (Math.random() - 0.5) * 0.2;
+                this.vy += (Math.random() - 0.5) * 0.2;
+                this.vx *= this.friction;
+                this.vy *= this.friction;
+
+                this.x += this.vx * timeScale;
+                this.y += this.vy * timeScale;
+
+                // 3D 投影计算
+                let dx3d = this.x - cx;
+                let dy3d = this.y - cy;
+                let dist2d = Math.hypot(dx3d, dy3d);
+                
+                let mappedZ = 0;
+                if (dist2d < R * 1.5) {
+                    let mapRatio = Math.min(1, dist2d / R);
+                    mappedZ = Math.sqrt(1 - mapRatio * mapRatio) * R * this.zSign;
+                }
+                
+                let currentZ = mappedZ * lerp3D;
+                
+                let cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+                let cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+                
+                let y1 = dy3d * cosX - currentZ * sinX;
+                let z1 = dy3d * sinX + currentZ * cosX;
+                let x2 = dx3d * cosY + z1 * sinY;
+                let z2 = -dx3d * sinY + z1 * cosY;
+                
+                let focalLength = 500;
+                let distance = Math.max(10, focalLength + currentCameraZ + z2);
+                let perspectiveScale = focalLength / distance;
+                
+                this.projScale = currentZoom2D * (1 - lerp3D) + perspectiveScale * lerp3D;
+                this.projX = cx + x2 * this.projScale;
+                this.projY = cy + y1 * this.projScale;
+                this.projZ = z2 * lerp3D;
+            }
+
+            draw() {
+                let tr = this.base_r;
+                let tg = this.base_g;
+                let tb = this.base_b;
+
+                if (colorSwapLerp > 0) {
+                    let inv_r = 255 - this.base_r;
+                    let inv_g = 255 - this.base_g;
+                    let inv_b = 255 - this.base_b;
+                    tr = this.base_r * (1 - colorSwapLerp) + inv_r * colorSwapLerp;
+                    tg = this.base_g * (1 - colorSwapLerp) + inv_g * colorSwapLerp;
+                    tb = this.base_b * (1 - colorSwapLerp) + inv_b * colorSwapLerp;
+                }
+                
+                let grayVal = 135;
+                let final_r = Math.floor(tr * (1 - mixLerp) + grayVal * mixLerp);
+                let final_g = Math.floor(tg * (1 - mixLerp) + grayVal * mixLerp);
+                let final_b = Math.floor(tb * (1 - mixLerp) + grayVal * mixLerp);
+                
+                let final_a = isGlowMode ? this.a * 0.35 : this.a;
+
+                if (lerp3D > 0.01) {
+                    let depthFactor = 1 - (this.projZ / (R * 2)); 
+                    final_a *= Math.max(0.1, Math.min(1.2, depthFactor));
+                }
+
+                let final_size = (isGlowMode ? this.size * 1.3 : this.size) * this.projScale;
+
+                ctx.fillStyle = `rgba(${final_r}, ${final_g}, ${final_b}, ${final_a})`;
+                ctx.beginPath();
+                ctx.arc(this.projX, this.projY, Math.max(0.1, final_size), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function getProjectedPoint(cx, cy, px, py, pz = 0) {
+            let currentZ = pz * lerp3D;
+            let cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+            let cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+            let y1 = py * cosX - currentZ * sinX;
+            let z1 = py * sinX + currentZ * cosX;
+            let x2 = px * cosY + z1 * sinY;
+            let z2 = -px * sinY + z1 * cosY;
+            let focalLength = 500;
+            let distance = Math.max(10, focalLength + currentCameraZ + z2);
+            let perspectiveScale = focalLength / distance;
+            let projScale = currentZoom2D * (1 - lerp3D) + perspectiveScale * lerp3D;
+            return { x: cx + x2 * projScale, y: cy + y1 * projScale, scale: projScale };
+        }
+
+        function drawProjectedPath(cx, cy, points, colorStr, baseLineWidth, isDashed, isClosed = false) {
+            if(points.length === 0) return;
+            ctx.beginPath();
+            let firstScale = 1;
+            for (let i = 0; i < points.length; i++) {
+                let p = getProjectedPoint(cx, cy, points[i].x, points[i].y);
+                if (i === 0) {
+                    ctx.moveTo(p.x, p.y);
+                    firstScale = p.scale; 
+                } else {
+                    ctx.lineTo(p.x, p.y);
+                }
+            }
+            if (isClosed) ctx.closePath();
+            
+            ctx.strokeStyle = colorStr;
+            ctx.lineWidth = baseLineWidth * firstScale; 
+            if (isDashed) ctx.setLineDash([10 * firstScale, 10 * firstScale]);
+            else ctx.setLineDash([]);
+            ctx.stroke();
+            ctx.setLineDash([]); 
+        }
+
+        function getArcPoints(r, startAngle, endAngle, steps = 15) {
+            let pts = [];
+            for(let i=0; i<=steps; i++) {
+                let a = startAngle + (endAngle - startAngle) * (i/steps);
+                pts.push({x: Math.cos(a)*r, y: Math.sin(a)*r});
+            }
+            return pts;
+        }
+
+        function getPetalPath(angle, radiusBase, radiusTip, widthSpread) {
+            let tip = {x: Math.cos(angle)*radiusTip, y: Math.sin(angle)*radiusTip};
+            let base = {x: Math.cos(angle)*radiusBase, y: Math.sin(angle)*radiusBase};
+            let midR = (radiusBase + radiusTip) * 0.45; 
+            let left = {x: Math.cos(angle - widthSpread)*midR, y: Math.sin(angle - widthSpread)*midR};
+            let right = {x: Math.cos(angle + widthSpread)*midR, y: Math.sin(angle + widthSpread)*midR};
+            return [base, left, tip, right];
+        }
+
+        function drawFormation(cx, cy) {
+            if (formationLerp < 0.01) return;
+            formationAngle += 0.0012 * timeScale; 
+            morphTime += 0.0005 * timeScale;
+
+            ctx.save();
+            let globalAlpha = formationLerp * 0.6; 
+            if (isGlowMode) ctx.globalCompositeOperation = 'lighter';
+
+            let colorYang = `rgba(${c2BaseR}, ${c2BaseG}, ${c2BaseB}, ${globalAlpha})`;
+            let yR = Math.max(50, c1BaseR), yG = Math.max(50, c1BaseG), yB = Math.max(50, c1BaseB);
+            let colorYin  = `rgba(${yR}, ${yG}, ${yB}, ${globalAlpha})`;
+            let mR = Math.min(255, Math.floor((c1BaseR + c2BaseR) / 2) + 40);
+            let mG = Math.min(255, Math.floor((c1BaseG + c2BaseG) / 2) + 40);
+            let mB = Math.min(255, Math.floor((c1BaseB + c2BaseB) / 2) + 40);
+            let colorMix  = `rgba(${mR}, ${mG}, ${mB}, ${globalAlpha * 1.5})`;
+            let colorText = `rgba(${mR}, ${mG}, ${mB}, ${formationLerp * 0.85})`;
+
+            switch(currentFormationType) {
+                case 'math':
+                    let k = 5 + Math.sin(morphTime * 3) * 3.5; 
+                    let morphSteps = 400; 
+                    let morphPoints = [];
+                    let maxTheta = Math.PI * 2 * 12; 
+                    for(let i = 0; i <= morphSteps; i++) {
+                        let theta = (i / morphSteps) * maxTheta;
+                        let rho = R * 1.45 + (R * 0.35) * Math.cos(k * theta);
+                        let a = theta + formationAngle;
+                        morphPoints.push({x: Math.cos(a)*rho, y: Math.sin(a)*rho});
+                    }
+                    drawProjectedPath(cx, cy, morphPoints, colorYang, 1.5, false, false);
+                    drawProjectedPath(cx, cy, getArcPoints(R * 1.1, 0, Math.PI*2, 60), colorMix, 0.8, true, true);
+                    drawProjectedPath(cx, cy, getArcPoints(R * 1.85, 0, Math.PI*2, 60), colorYin, 0.8, true, true);
+                    for (let i = 0; i < 4; i++) {
+                        let axisAngle = i * Math.PI/2 - formationAngle * 1.5; 
+                        let pStart = {x: Math.cos(axisAngle)*R*1.1, y: Math.sin(axisAngle)*R*1.1};
+                        let pEnd = {x: Math.cos(axisAngle)*R*2.1, y: Math.sin(axisAngle)*R*2.1};
+                        drawProjectedPath(cx, cy, [pStart, pEnd], colorMix, 0.8, true, false);
+                    }
+                    break;
+                case 'mandala':
+                    drawProjectedPath(cx, cy, getArcPoints(R*1.05, 0, Math.PI*2, 60), colorYang, 1.5, false, true);
+                    drawProjectedPath(cx, cy, getArcPoints(R*1.18, 0, Math.PI*2, 60), colorMix, 1, true, true);
+                    drawProjectedPath(cx, cy, getArcPoints(R*1.85, 0, Math.PI*2, 60), colorYang, 2, false, true);
+                    
+                    let sq1 = [], sq2 = [];
+                    for(let i=0; i<4; i++) {
+                        let a1 = i * Math.PI/2 + formationAngle;
+                        let a2 = i * Math.PI/2 + formationAngle + Math.PI/4;
+                        sq1.push({x: Math.cos(a1)*R*1.65, y: Math.sin(a1)*R*1.65});
+                        sq2.push({x: Math.cos(a2)*R*1.65, y: Math.sin(a2)*R*1.65});
+                    }
+                    drawProjectedPath(cx, cy, sq1, colorYang, 1.5, false, true);
+                    drawProjectedPath(cx, cy, sq2, colorYang, 1.5, false, true);
+
+                    let innerAngle = -formationAngle * 2;
+                    for(let i=0; i<12; i++) {
+                        let aCenter = i * Math.PI/6 + innerAngle;
+                        let pTip = {x: Math.cos(aCenter)*R*1.5, y: Math.sin(aCenter)*R*1.5};
+                        let pBaseL = {x: Math.cos(aCenter - 0.1)*R*1.18, y: Math.sin(aCenter - 0.1)*R*1.18};
+                        let pBaseR = {x: Math.cos(aCenter + 0.1)*R*1.18, y: Math.sin(aCenter + 0.1)*R*1.18};
+                        drawProjectedPath(cx, cy, [pBaseL, pTip, pBaseR], colorMix, 1, false, false);
+                    }
+                    for(let i=0; i<16; i++) {
+                        let a = i * Math.PI/8 + formationAngle;
+                        let pStart = {x: Math.cos(a)*R*1.85, y: Math.sin(a)*R*1.85};
+                        let pEnd = {x: Math.cos(a)*R*2.05, y: Math.sin(a)*R*2.05};
+                        if (i % 2 === 0) {
+                            drawProjectedPath(cx, cy, [pStart, pEnd], colorYang, 1.5, false, false);
+                        } else {
+                            drawProjectedPath(cx, cy, [pStart, pEnd], colorMix, 0.8, true, false);
+                        }
+                    }
+                    break;
+                case 'lotus':
+                    drawProjectedPath(cx, cy, getArcPoints(R*1.08, 0, Math.PI*2, 60), colorYang, 2, false, true);
+                    drawProjectedPath(cx, cy, getArcPoints(R*1.15, 0, Math.PI*2, 60), colorMix, 1, true, true);
+                    let breathe = Math.sin(morphTime * 5); 
+                    for(let i=0; i<12; i++) {
+                        let a = i * Math.PI/6 + formationAngle;
+                        drawProjectedPath(cx, cy, getPetalPath(a, R*1.08, R*1.45 + breathe * 8, 0.15), colorMix, 1.5, false, true);
+                    }
+                    for(let i=0; i<12; i++) {
+                        let a = i * Math.PI/6 + formationAngle + Math.PI/12;
+                        drawProjectedPath(cx, cy, getPetalPath(a, R*1.15, R*1.85 + breathe * 15, 0.12), colorYang, 2, false, true);
+                    }
+                    for(let i=0; i<12; i++) {
+                        let a = i * Math.PI/6 + formationAngle;
+                        drawProjectedPath(cx, cy, getPetalPath(a, R*1.4, R*2.15 + breathe * 20, 0.08), colorYin, 1.5, false, true);
+                    }
+                    drawProjectedPath(cx, cy, getArcPoints(R*2.3 + breathe * 22, 0, Math.PI*2, 60), colorMix, 0.5, true, true);
+                    break;
+                case 'bagua':
+                    drawProjectedPath(cx, cy, getArcPoints(R * 1.15, 0, Math.PI*2, 60), colorYang, 1, false, true);
+                    drawProjectedPath(cx, cy, getArcPoints(R * 1.6, 0, Math.PI*2, 60), colorMix, 3, false, true);
+                    const trigrams = [[1, 1, 1], [1, 1, 0], [0, 1, 0], [1, 0, 0], [0, 0, 0], [0, 0, 1], [1, 0, 1], [0, 1, 1]];
+                    let spread = 0.28; 
+                    for (let i = 0; i < 8; i++) {
+                        let angle = i * Math.PI / 4 + formationAngle;
+                        let lines = trigrams[i];
+                        for (let j = 0; j < 3; j++) {
+                            let r = R * 1.45 - j * 16;
+                            if (lines[j] === 1) {
+                                drawProjectedPath(cx, cy, getArcPoints(r, angle - spread, angle + spread, 15), colorYang, 8, false, false);
+                            } else {
+                                drawProjectedPath(cx, cy, getArcPoints(r, angle - spread, angle - 0.05, 8), colorYang, 8, false, false);
+                                drawProjectedPath(cx, cy, getArcPoints(r, angle + 0.05, angle + spread, 8), colorYang, 8, false, false);
+                            }
+                        }
+                    }
+                    break;
+            }
+            ctx.restore();
+        }
+
+        function initParticles() {
+            particles = [];
+            const numParticles = 6500; 
+            let attempts = 0;
+            while (particles.length < numParticles && attempts < 50000) {
+                attempts++;
+                let x = (Math.random() * 2 - 1) * R;
+                let y = (Math.random() * 2 - 1) * R;
+                let colorType = getTaiChiColor(x, y);
+                if (colorType !== null) particles.push(new Particle(x, y, colorType));
+            }
+        }
+
+        function animate() {
+            let bgR = Math.floor(bgBaseR * (1 - mixLerp) + 135 * mixLerp);
+            let bgG = Math.floor(bgBaseG * (1 - mixLerp) + 135 * mixLerp);
+            let bgB = Math.floor(bgBaseB * (1 - mixLerp) + 135 * mixLerp);
+            
+            timeScale += (targetTimeScale - timeScale) * 0.1;
+            let trailAlpha = isGlowMode ? 0.12 : 0.2;
+            if (timeScale < 0.5) trailAlpha *= 0.5;
+
+            document.body.style.backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+            ctx.fillStyle = `rgba(${bgR}, ${bgG}, ${bgB}, ${trailAlpha})`; 
+            ctx.fillRect(0, 0, width, height);
+
+            let targetModeLerp = (currentMode === 1) ? 0 : 1;
+            modeLerp += (targetModeLerp - modeLerp) * 0.03;
+            colorSwapLerp += (targetColorSwap - colorSwapLerp) * 0.04;
+            angleOffset += (targetAngleOffset - angleOffset) * 0.06; 
+            
+            // 动能衰减
+            mouseEnergy *= 0.94; 
+
+            // 【修复核心交互】: 无论是否处于拖拽状态，只要动能足够且不在3D模式，就触发游龙
+            if (mouseEnergy > 35 && !is3DMode) {
+                isDragonMode = true;
+                dragonSpine.push({x: mouse.logicalX, y: mouse.logicalY});
+                if (dragonSpine.length > 45) dragonSpine.shift();
+            } else {
+                isDragonMode = false;
+                if (dragonSpine.length > 0) dragonSpine.shift();
+                if (dragonSpine.length > 0) dragonSpine.shift(); // 快速收回龙尾
+            }
+
+            let targetDragon = isDragonMode ? 1 : 0;
+            dragonLerp += (targetDragon - dragonLerp) * 0.08;
+
+            if (!isZenMode && mixEnergy > 480) {
+                isZenMode = true; ignoreDrag = true; 
+                setTimeout(() => { isZenMode = false; mixEnergy = 0; }, 8000); 
+            }
+
+            if (isZenMode) { mixEnergy = 500; } 
+            else if (!isDragging || ignoreDrag) { mixEnergy *= 0.96; }
+
+            let target3D = is3DMode ? 1 : 0;
+            lerp3D += (target3D - lerp3D) * 0.03;
+            
+            if (is3DMode && !isDragging) targetRotY += 0.003 * timeScale; 
+            rotX += (targetRotX - rotX) * 0.05;
+            rotY += (targetRotY - rotY) * 0.05;
+            currentCameraZ += (targetCameraZ - currentCameraZ) * 0.08;
+            currentZoom2D += (targetZoom2D - currentZoom2D) * 0.1;
+
+            angle += 0.0035 * timeScale; 
+            const cx = width / 2;
+            const cy = height / 2;
+
+            let targetFormation = isFormationMode ? 1 : 0;
+            formationLerp += (targetFormation - formationLerp) * 0.05;
+            drawFormation(cx, cy);
+
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update(cx, cy, angle);
+            }
+            if (lerp3D > 0.01) particles.sort((a, b) => b.projZ - a.projZ);
+
+            ctx.globalCompositeOperation = isGlowMode ? 'lighter' : 'source-over';
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].draw();
+            }
+
+            if (pointerTrail.length > 0) {
+                ctx.beginPath();
+                for (let i = 0; i < pointerTrail.length; i++) {
+                    let pt = pointerTrail[i]; pt.age++;
+                    if (i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y);
+                }
+                if (pointerTrail.length > 15 || !isDragging) pointerTrail.shift();
+                ctx.strokeStyle = `rgba(0, 255, 255, ${isDragging ? 0.6 : 0.2})`;
+                ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                ctx.stroke();
+            }
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // UI 控制
+            let totalAlpha = isZenMode ? (Math.sin(Date.now() * 0.002) * 0.1 + 0.85) : 0;
+            if (currentMode === 1) {
+                zenText.className = isZenMode ? 'text-layer active' : 'text-layer';
+                zenText2.className = 'text-layer';
+            } else {
+                zenText2.className = isZenMode ? 'text-layer active' : 'text-layer';
+                zenText.className = 'text-layer';
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            let dx = 0, dy = 0;
+            if(lastMouse.x !== -1000) {
+                dx = e.clientX - lastMouse.x; dy = e.clientY - lastMouse.y;
+                let speed = Math.hypot(dx, dy);
+                // 增加动能
+                mouseEnergy += speed * 0.18;
+                if (mouseEnergy > 250) mouseEnergy = 250; 
+
+                if (is3DMode && isDragging && !ignoreDrag) {
+                    targetRotY += dx * 0.01; targetRotX -= dy * 0.01;
+                } else if (isDragging && !ignoreDrag) {
+                    // 降低滑动进入无极模式的积累速度，以便更长时间欣赏游龙
+                    mixEnergy += speed * 0.12; 
+                    if (mixEnergy > 500) mixEnergy = 500;
+                }
+                if (isDragging) pointerTrail.push({x: e.clientX, y: e.clientY, age: 0});
+            }
+            lastMouse.x = e.clientX; lastMouse.y = e.clientY;
+            mouse.x = e.clientX; mouse.y = e.clientY;
+            updateLogicalMouse(e.clientX, e.clientY);
+            mouse.isActive = true;
+        });
+
+        const formationToggleBtn = document.getElementById('formation-toggle');
+        const formationTypeSelect = document.getElementById('formation-type');
+
+        modeBtn.addEventListener('click', () => {
+            currentMode = currentMode === 1 ? 2 : 1;
+            modeBtn.innerText = currentMode === 1 ? '当前：太极图' : '当前：阴阳流';
+            mixEnergy = 0; isZenMode = false; ignoreDrag = false;
+
+            if (currentMode === 2 && isFormationMode) {
+                isFormationMode = false;
+                formationToggleBtn.classList.remove('active');
+                formationTypeSelect.style.display = 'none';
+            }
+        });
+
+        formationToggleBtn.addEventListener('click', () => {
+            if (currentMode === 2) {
+                showHintMessage("⚠️ 阴阳流模式下法阵被封印", '#ffd700');
+                return;
+            }
+
+            if (is3DMode) {
+                isFormationMode = !isFormationMode;
+                if (isFormationMode) {
+                    currentFormationType = 'math';
+                    formationTypeSelect.value = 'math';
+                    formationToggleBtn.classList.add('active');
+                    formationTypeSelect.style.display = 'block';
+                    showHintMessage("📐 3D维度专属：几何公式已接入", '#00ffff');
+                } else {
+                    formationToggleBtn.classList.remove('active');
+                    formationTypeSelect.style.display = 'none';
+                }
+                return;
+            }
+
+            isFormationMode = !isFormationMode;
+            formationToggleBtn.classList.toggle('active');
+            formationTypeSelect.style.display = isFormationMode ? 'block' : 'none';
+        });
+
+        formationTypeSelect.addEventListener('change', (e) => {
+            if (is3DMode && e.target.value !== 'math') {
+                showHintMessage("⚠️ 3D维度下仅支持纯粹的数学几何", '#ffd700');
+                e.target.value = 'math'; 
+                currentFormationType = 'math';
+                return;
+            }
+            currentFormationType = e.target.value;
+        });
+
+        const colorToggle = document.getElementById('color-toggle');
+        const colorPanel = document.getElementById('color-panel');
+        colorToggle.addEventListener('click', () => colorPanel.classList.toggle('show'));
+
+        document.getElementById('bg-color-picker').addEventListener('input', (e) => {
+            let rgb = hexToRgb(e.target.value);
+            if(rgb) { bgBaseR = rgb.r; bgBaseG = rgb.g; bgBaseB = rgb.b; }
+        });
+        document.getElementById('color1-picker').addEventListener('input', (e) => {
+            let rgb = hexToRgb(e.target.value);
+            if(rgb) {
+                c1BaseR = rgb.r; c1BaseG = rgb.g; c1BaseB = rgb.b;
+                for(let p of particles) if (p.isLeft) {
+                    p.base_r = Math.max(0, Math.min(255, c1BaseR + (Math.random() * 30 - 15)));
+                    p.base_g = Math.max(0, Math.min(255, c1BaseG + (Math.random() * 30 - 15)));
+                    p.base_b = Math.max(0, Math.min(255, c1BaseB + (Math.random() * 30 - 15)));
+                }
+            }
+        });
+        document.getElementById('color2-picker').addEventListener('input', (e) => {
+            let rgb = hexToRgb(e.target.value);
+            if(rgb) {
+                c2BaseR = rgb.r; c2BaseG = rgb.g; c2BaseB = rgb.b;
+                for(let p of particles) if (!p.isLeft) {
+                    p.base_r = Math.max(0, Math.min(255, c2BaseR + (Math.random() * 20 - 10)));
+                    p.base_g = Math.max(0, Math.min(255, c2BaseG + (Math.random() * 20 - 10)));
+                    p.base_b = Math.max(0, Math.min(255, c2BaseB + (Math.random() * 20 - 10)));
+                }
+            }
+        });
+
+        const glowToggleBtn = document.getElementById('glow-toggle');
+        glowToggleBtn.addEventListener('click', () => {
+            isGlowMode = !isGlowMode;
+            glowToggleBtn.classList.toggle('active');
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && targetTimeScale !== 0.1) {
+                targetTimeScale = 0.1; 
+                document.getElementById('time-freeze-hint').style.opacity = '1';
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') { 
+                targetTimeScale = 1.0; 
+                document.getElementById('time-freeze-hint').style.opacity = '0'; 
+            }
+        });
+
+        const mode3dToggleBtn = document.getElementById('mode-3d-toggle');
+        const hint3DText = document.getElementById('hint-3d');
+        mode3dToggleBtn.addEventListener('click', () => {
+            is3DMode = !is3DMode;
+            mode3dToggleBtn.classList.toggle('active');
+            
+            if (is3DMode) {
+                if (isFormationMode && currentFormationType !== 'math') {
+                    isFormationMode = false;
+                    formationToggleBtn.classList.remove('active');
+                    formationTypeSelect.style.display = 'none';
+                } else if (isFormationMode && currentFormationType === 'math') {
+                    showHintMessage("📐 3D维度专属：几何公式保持接入", '#00ffff');
+                }
+                targetRotX = -0.4; targetRotY = 0.5;
+                hint3DText.style.opacity = '1';
+                setTimeout(() => hint3DText.style.opacity = '0', 5000);
+            } else {
+                targetRotX = 0; targetRotY = 0; targetCameraZ = 200; targetZoom2D = 1.0;
+                hint3DText.style.opacity = '0';
+            }
+        });
+
+        window.addEventListener('wheel', (e) => {
+            if (is3DMode) {
+                targetCameraZ += e.deltaY * 0.8;
+                targetCameraZ = Math.max(-250, Math.min(2500, targetCameraZ));
+            } else {
+                targetZoom2D -= e.deltaY * 0.0015;
+                targetZoom2D = Math.max(0.2, Math.min(5.0, targetZoom2D));
+            }
+        }, {passive: true});
+
+        const authorBtn = document.getElementById('author-btn');
+        const authorModal = document.getElementById('author-modal');
+        const closeAuthor = document.getElementById('close-author');
+        authorBtn.addEventListener('click', () => authorModal.classList.add('show'));
+        closeAuthor.addEventListener('click', () => authorModal.classList.remove('show'));
+        authorModal.addEventListener('click', (e) => { if (e.target === authorModal) authorModal.classList.remove('show'); });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.closest('#mode-btn') || e.target.closest('#color-controls') || 
+                e.target.closest('#magic-controls') || e.target.closest('#d3-controls') ||
+                e.target.closest('#author-btn') || e.target.closest('#author-modal')) return;
+
+            isDragging = true;
+            if (currentMode === 1) targetAngleOffset += Math.PI; 
+            else targetColorSwap = targetColorSwap === 0 ? 1 : 0; 
+
+            if (is3DMode) {
+                currentCameraZ += 150; rotY -= 0.15; rotX -= 0.05;
+            } else {
+                let cx = width / 2; let cy = height / 2;
+                let logicalClickX = cx + (e.clientX - cx) / currentZoom2D;
+                let logicalClickY = cy + (e.clientY - cy) / currentZoom2D;
+                for(let p of particles) {
+                    let dx = p.x - logicalClickX; let dy = p.y - logicalClickY;
+                    let dist = Math.hypot(dx, dy);
+                    if(dist < 200) {
+                        let force = (200 - dist) / 8;
+                        p.vx += (dx / dist) * force; p.vy += (dy / dist) * force;
+                    }
+                }
+            }
+            pointerTrail = [];
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; ignoreDrag = false; });
+
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.closest('#mode-btn') || e.target.closest('#color-controls') || 
+                e.target.closest('#magic-controls') || e.target.closest('#d3-controls') ||
+                e.target.closest('#author-btn') || e.target.closest('#author-modal')) return;
+
+            let now = Date.now();
+            if (now - lastTapTime < 300) {
+                if (targetTimeScale === 1.0) { 
+                    targetTimeScale = 0.1; 
+                    document.getElementById('time-freeze-hint').style.opacity = '1'; 
+                } 
+                else { 
+                    targetTimeScale = 1.0; 
+                    document.getElementById('time-freeze-hint').style.opacity = '0'; 
+                }
+                lastTapTime = 0; return;
+            }
+            lastTapTime = now;
+
+            if (e.touches.length === 2) {
+                initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                return; 
+            }
+
+            if (e.touches.length === 1) {
+                isDragging = true;
+                mouse.x = lastMouse.x = e.touches[0].clientX; mouse.y = lastMouse.y = e.touches[0].clientY;
+                updateLogicalMouse(mouse.x, mouse.y); mouse.isActive = true;
+                
+                if (currentMode === 1) targetAngleOffset += Math.PI;
+                else targetColorSwap = targetColorSwap === 0 ? 1 : 0;
+                pointerTrail = []; 
+
+                if (is3DMode) {
+                    currentCameraZ += 150; rotY -= 0.15; rotX -= 0.05;
+                } else {
+                    let cx = width / 2; let cy = height / 2;
+                    let logicalTouchX = cx + (mouse.x - cx) / currentZoom2D;
+                    let logicalTouchY = cy + (mouse.y - cy) / currentZoom2D;
+
+                    for(let p of particles) {
+                        let dx = p.x - logicalTouchX; let dy = p.y - logicalTouchY;
+                        let dist = Math.hypot(dx, dy);
+                        if(dist < 200) {
+                            let force = (200 - dist) / 8;
+                            p.vx += (dx / dist) * force; p.vy += (dy / dist) * force;
+                        }
+                    }
+                }
+            }
+        }, {passive: false});
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && initialPinchDist > 0) {
+                let currDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                let pinchDelta = currDist - initialPinchDist;
+                
+                if (is3DMode) {
+                    targetCameraZ -= pinchDelta * 2; targetCameraZ = Math.max(-250, Math.min(2500, targetCameraZ));
+                } else {
+                    targetZoom2D += pinchDelta * 0.005; targetZoom2D = Math.max(0.2, Math.min(5.0, targetZoom2D));
+                }
+                initialPinchDist = currDist; return;
+            }
+
+            if (e.touches.length === 1 && isDragging) {
+                let currX = e.touches[0].clientX; let currY = e.touches[0].clientY;
+                let dx = currX - lastMouse.x; let dy = currY - lastMouse.y;
+                let speed = Math.hypot(dx, dy);
+                
+                mouseEnergy += speed * 0.18; if (mouseEnergy > 250) mouseEnergy = 250; 
+
+                if (is3DMode && !ignoreDrag) {
+                    targetRotY += dx * 0.01; targetRotX -= dy * 0.01;
+                } else if (!ignoreDrag) {
+                    mixEnergy += speed * 0.12; if (mixEnergy > 500) mixEnergy = 500;
+                }
+                pointerTrail.push({x: currX, y: currY, age: 0});
+                lastMouse.x = currX; lastMouse.y = currY; mouse.x = currX; mouse.y = currY;
+                updateLogicalMouse(currX, currY);
+            }
+        }, {passive: true});
+
+        window.addEventListener('touchend', () => { isDragging = false; mouse.isActive = false; ignoreDrag = false; });
+        window.addEventListener('resize', () => resize());
+
+        resize(); initParticles(); animate();
+    </script>
+</body>
+</html>
